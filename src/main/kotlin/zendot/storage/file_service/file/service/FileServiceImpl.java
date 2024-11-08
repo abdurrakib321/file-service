@@ -21,10 +21,7 @@ import zendot.storage.file_service.file.util.ImageCompressor;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
+import java.io.*;
 import java.time.Instant;
 import java.util.Optional;
 
@@ -123,9 +120,24 @@ public class FileServiceImpl implements FileService {
     @Override
     public UploadedFile thumbnailCreation(MultipartFile multipartFile, S3Path s3Path, String bucket,Long size) throws Exception {
         InputStream thumbnail = createThumbnail(multipartFile.getInputStream());
-        String path = s3Path.getPath() + randomName();
-//        Long temp=24L;
-        return upload(thumbnail, path, bucket,size);
+
+        File tempFile = File.createTempFile("thumbnail", ".tmp");
+        try (OutputStream outputStream = new FileOutputStream(tempFile)) {
+            thumbnail.transferTo(outputStream);
+        }
+
+        // Get the size of the temporary file
+         size = tempFile.length();
+
+        // Upload the file using FileInputStream
+        try (InputStream thumbnailInputStream = new FileInputStream(tempFile)) {
+            String path = s3Path.getPath() + randomName();
+            return upload(thumbnailInputStream, path, bucket, size);
+        } finally {
+            // Clean up the temporary file
+           boolean flag= tempFile.delete();
+           System.out.println("file is deleted "+flag);
+        }
     }
 
     public InputStream createThumbnail(InputStream videoStream) throws IOException {
